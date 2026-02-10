@@ -331,6 +331,22 @@ endif()
         DESTINATION ${${itk-module}_INSTALL_INCLUDE_DIR}
         COMPONENT Development
       )
+
+      # FIX: For external modules, add binary include dir to wrapping includes
+      if(NOT ITK_SOURCE_DIR)
+        # Add to include directories so wrapping can find the export header
+        list(
+          APPEND
+          ${itk-module}_INCLUDE_DIRS
+          ${${itk-module}_BINARY_DIR}/include
+        )
+        # Also ensure it's in the target's include directories
+        target_include_directories(
+          ${itk-module}
+          PUBLIC
+            "$<BUILD_INTERFACE:${${itk-module}_BINARY_DIR}/include>"
+        )
+      endif()
     endif()
     if(
       (
