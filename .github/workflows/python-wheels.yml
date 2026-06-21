@@ -1,0 +1,76 @@
+# Build ITK Python wheels with cibuildwheel (experimental).
+#
+# One job per platform: ITK is compiled once inside the build container
+# (CIBW_BEFORE_ALL, guarded), then each group wheel is produced by pointing
+# cibuildwheel at its definition under Wrapping/Packaging/. A per-wheel matrix is
+# not used because the wrapped ITK tree is too large to share across runners.
+# Images, arches, and a Windows variant still need iteration in real CI.
+name: Python wheels
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["Wrapping/Packaging/**", "Utilities/Maintenance/cibw-build-wrapped-itk.sh", ".github/workflows/python-wheels.yml"]
+
+jobs:
+  wheels:
+    name: wheels ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: linux-x86_64,  runner: ubuntu-latest,    archs: x86_64,  itk_dir: /project/build-python }
+          - { id: linux-aarch64, runner: ubuntu-24.04-arm, archs: aarch64, itk_dir: /project/build-python }
+          - { id: macos-arm64,   runner: macos-14,         archs: arm64,   itk_dir: $GITHUB_WORKSPACE/build-python }
+          - { id: macos-x86_64,  runner: macos-13,         archs: x86_64,  itk_dir: $GITHUB_WORKSPACE/build-python }
+          # - { id: windows,     runner: windows-2022,     archs: AMD64,   itk_dir: ... }  # needs a .ps1 before-all variant
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ITK version is derived from git describe
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - run: python -m pip install "cibuildwheel>=2.20"
+
+      - name: Build all ITK wheels (one ITK compile, sliced per group)
+        shell: bash
+        run: |
+          for group in core numerics io filtering registration segmentation; do
+            echo "::group::itk-$group"
+            python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/$group"
+            echo "::endgroup::"
+          done
+          # meta ships no code but is tagged per platform+ABI (like PyPI's itk wheel),
+          # so it is built PER PLATFORM here too (the guarded before-all is a no-op for it).
+          python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/meta"
+        env:
+          # One abi3 wheel per platform (requires wheel.py-api="cp39" in the pyprojects).
+          CIBW_BUILD: "cp39-*"
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+
+          # Build wrapped ITK once, in-container, before the first wheel (guarded).
+          CIBW_BEFORE_ALL: bash Utilities/Maintenance/cibw-build-wrapped-itk.sh "{project}"
+
+          # Every wheel slices the one ITK build. {project} resolves to the
+          # in-container/in-checkout root; itk_dir handles the Linux-vs-native path.
+          CIBW_ENVIRONMENT: >-
+            ITK_BINARY_DIR=${{ matrix.itk_dir }}
+            ITK_SOURCE_DIR={project}
+          CIBW_CONFIG_SETTINGS: >-
+            cmake.define.ITK_BINARY_DIR=${{ matrix.itk_dir }}
+            cmake.define.ITKPythonPackage_ITK_BINARY_REUSE=ON
+            cmake.define.ITKPythonPackage_USE_TBB=OFF
+
+          # cibuildwheel auto-repairs (auditwheel/delocate) — light here since ITK is static.
+          CIBW_TEST_COMMAND: 'python -c "import itk; print(itk.Version.GetITKVersion())"'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itk-wheels-${{ matrix.id }}
+          path: wheelhouse/*.whl

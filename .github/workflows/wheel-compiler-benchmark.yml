@@ -1,0 +1,55 @@
+# Benchmark: gcc vs Clang for the wrapped-ITK build (experimental).
+#
+# Answers "how much does Clang help the wheel build?" on Linux, the platform the
+# weekly-wheel Clang switch targets (InsightSoftwareConsortium/ITK#4656, #3093).
+# Two parallel jobs build the wrapped ITK tree with each compiler under
+# `/usr/bin/time -v`, reporting wall-clock and peak memory. Manual trigger only.
+#
+# Tune before relying on it: a full wrapped build may exceed a runner's time
+# limit, so this builds the default module set with wrapping (no heavy remote
+# modules). Peak memory is the metric that most distinguishes the compilers on
+# ITK's large generated wrapping translation units.
+name: Wheel compiler benchmark
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: wrapped-ITK (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { compiler: gcc,   cc: gcc,   cxx: g++ }
+          - { compiler: clang, cc: clang, cxx: clang++ }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - run: sudo apt-get update && sudo apt-get install -y ${{ matrix.compiler }} ninja-build cmake
+
+      - name: Configure (${{ matrix.compiler }})
+        run: |
+          cmake -B build-bench -S . -G Ninja \
+            -DITK_WRAP_PYTHON:BOOL=ON \
+            -DCMAKE_BUILD_TYPE:STRING=Release \
+            -DBUILD_TESTING:BOOL=OFF \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+      - name: Build (timed + peak memory)
+        run: /usr/bin/time -v cmake --build build-bench 2> time-${{ matrix.compiler }}.log || true
+
+      - name: Report
+        run: |
+          {
+            echo "### ${{ matrix.compiler }}"
+            grep -E 'Elapsed \(wall clock\)|Maximum resident set size' time-${{ matrix.compiler }}.log || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: time-${{ matrix.compiler }}
+          path: time-${{ matrix.compiler }}.log
