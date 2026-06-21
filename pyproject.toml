@@ -280,6 +280,40 @@ cmd = '''cp ./build-debug-python/Wrapping/Generators/Python/WrapITK.pth $(python
 description = "Run a Python executable with the development ITK Python Debug build package"
 depends-on = ["build-debug-python"]
 
+[tool.pixi.feature.wheel.dependencies]
+scikit-build-core = ">=0.10"
+python-build = ">=1.2"
+numpy = ">=2"
+
+# Compiler: defaults to the pixi env's cxx-compiler (gcc on Linux, clang on macOS).
+# Override with WHEEL_CC / WHEEL_CXX to drive the build with Clang, the target for
+# weekly ITK wheels (InsightSoftwareConsortium/ITK#4656, gated on #3093):
+#   WHEEL_CC=clang WHEEL_CXX=clang++ pixi run -e wheel build-wrapped-itk
+[tool.pixi.feature.wheel.tasks.configure-wheels]
+cmd = '''cmake \
+  -Bbuild-python \
+  -S. \
+  -GNinja \
+  -DITK_WRAP_PYTHON:BOOL=ON \
+  -DCMAKE_BUILD_TYPE:STRING=Release \
+  -DBUILD_TESTING:BOOL=OFF \
+  -DWRAP_ITK_INSTALL_COMPONENT_PER_MODULE:BOOL=ON \
+  -DWRAP_ITK_INSTALL_COMPONENT_IDENTIFIER:STRING=PythonWheel \
+  ${WHEEL_CC:+-DCMAKE_C_COMPILER:STRING=$WHEEL_CC} \
+  ${WHEEL_CXX:+-DCMAKE_CXX_COMPILER:STRING=$WHEEL_CXX} \
+  -DPY_SITE_PACKAGES_PATH:STRING=.'''
+description = "Configure ITK for wheel slicing (per-module components + wheel-relative install)"
+outputs = ["build-python/CMakeCache.txt"]
+
+[tool.pixi.feature.wheel.tasks.build-wrapped-itk]
+cmd = "cmake --build build-python"
+description = "Build the wrapped ITK tree once — the reuse target every wheel slices"
+depends-on = ["configure-wheels"]
+
+[tool.pixi.feature.wheel.tasks.build-wheels]
+cmd = "python Utilities/Maintenance/build_wheels.py"
+description = "Slice the pre-built ITK tree into all ITK Python wheels (run build-wrapped-itk first)"
+
 [tool.pixi.environments]
 dev = ["dev"]
 cxx = ["dev", "cxx"]
@@ -287,3 +321,4 @@ python = ["python", "dev"]
 pre-commit = ["pre-commit"]
 external-data-upload = ["external-data-upload"]
 doxygen = ["dev", "doxygen"]
+wheel = ["python", "dev", "wheel"]
