@@ -1,0 +1,30 @@
+# itk — the umbrella package users `pip install`. Ships no code; its only job is
+# to depend on the six group wheels at the same version.
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "itk"
+version = "6.0b2"                        # the meta package's OWN distribution version
+description = "ITK — N-dimensional scientific image processing (meta-package)."
+readme = "../README.md"
+requires-python = ">=3.9"
+dependencies = [
+    # Pinned to the group wheels' published version (ITK's version).
+    "itk-core==6.0b2",
+    "itk-numerics==6.0b2",
+    "itk-io==6.0b2",
+    "itk-filtering==6.0b2",
+    "itk-registration==6.0b2",
+    "itk-segmentation==6.0b2",
+    "numpy",
+]
+
+[tool.scikit-build]
+# Tag to the platform + ABI (not py3-none-any), matching the PyPI itk wheel, so
+# `pip install itk` only resolves where the group wheels exist. Built per platform.
+wheel.platlib = true
+wheel.py-api = "cp39"
+cmake.source-dir = "."
+build-dir = "build/{wheel_tag}"

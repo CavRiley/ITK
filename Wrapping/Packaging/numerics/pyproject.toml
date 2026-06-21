@@ -1,0 +1,22 @@
+# itk-numerics — built by slicing the pre-built ITK tree (see ../README.md).
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "itk-numerics"
+version = "6.0b2"
+description = "ITK numerics modules (FFT, optimizers, statistics)."
+readme = "../README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "itk-core==6.0b2",
+]
+
+[tool.scikit-build]
+cmake.source-dir = ".."
+cmake.build-type = "Release"
+cmake.version = ">=3.26.6"
+build-dir = "build/{wheel_tag}"
+wheel.platlib = true
+install.strip = true
