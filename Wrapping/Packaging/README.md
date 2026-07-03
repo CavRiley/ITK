@@ -59,7 +59,10 @@ cibuildwheel.
 - **Meta wheel is platform-tagged.** The `itk` package ships no code but is
   tagged to the platform + ABI (not `py3-none-any`), matching the PyPI `itk`
   wheel, so `pip install itk` only resolves where the group wheels exist.
-- **Compiler.** The build uses the pixi env compiler by default (gcc on Linux,
-  clang on macOS). Set `WHEEL_CC` / `WHEEL_CXX` to override — e.g. to drive the
-  Linux build with Clang, the target for weekly wheels (ITK#4656, gated on
-  #3093). `.github/workflows/wheel-compiler-benchmark.yml` times gcc vs Clang.
+- **Compiler.** Local builds use the pixi env compiler (gcc on Linux, clang on
+  macOS). Set `WHEEL_CC` / `WHEEL_CXX` to override — e.g. to drive the Linux
+  build with Clang, the target for weekly wheels (ITK#4656, gated on #3093).
+  `.github/workflows/wheel-compiler-benchmark.yml` times gcc vs Clang. In the
+  manylinux CI container the wrapped-ITK build instead uses the image's own
+  gcc-toolset (see `cibw-build-wrapped-itk.sh`) so ITK's static libraries share
+  the extension's ABI baseline and pass `auditwheel`.
