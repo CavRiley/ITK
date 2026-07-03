@@ -62,8 +62,9 @@ jobs:
           CIBW_ENVIRONMENT: >-
             ITK_BINARY_DIR=${{ matrix.itk_dir }}
             ITK_SOURCE_DIR={project}
+          # ITK_BINARY_DIR is passed via CIBW_ENVIRONMENT, not here: config
+          # settings are not shell-expanded, so $GITHUB_WORKSPACE would stay literal.
           CIBW_CONFIG_SETTINGS: >-
-            cmake.define.ITK_BINARY_DIR=${{ matrix.itk_dir }}
             cmake.define.ITKPythonPackage_ITK_BINARY_REUSE=ON
             cmake.define.ITKPythonPackage_USE_TBB=OFF
 

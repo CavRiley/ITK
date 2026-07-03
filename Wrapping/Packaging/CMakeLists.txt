@@ -12,7 +12,14 @@ if(NOT DEFINED ITK_SOURCE_DIR)
   )
 endif()
 
-# Pre-built, Python-wrapped ITK tree to reuse; supplied by the driver.
+# Pre-built, Python-wrapped ITK tree to reuse. build_wheels.py passes it as a
+# define; under cibuildwheel it arrives only in the environment, because
+# CIBW_ENVIRONMENT expands $GITHUB_WORKSPACE whereas a cmake.define config-setting
+# would not.
+if(NOT DEFINED ITK_BINARY_DIR AND DEFINED ENV{ITK_BINARY_DIR})
+  set(ITK_BINARY_DIR "$ENV{ITK_BINARY_DIR}")
+endif()
+
 if(
   NOT
     DEFINED
