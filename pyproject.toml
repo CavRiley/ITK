@@ -290,18 +290,7 @@ numpy = ">=2"
 # weekly ITK wheels (InsightSoftwareConsortium/ITK#4656, gated on #3093):
 #   WHEEL_CC=clang WHEEL_CXX=clang++ pixi run -e wheel build-wrapped-itk
 [tool.pixi.feature.wheel.tasks.configure-wheels]
-cmd = '''cmake \
-  -Bbuild-python \
-  -S. \
-  -GNinja \
-  -DITK_WRAP_PYTHON:BOOL=ON \
-  -DCMAKE_BUILD_TYPE:STRING=Release \
-  -DBUILD_TESTING:BOOL=OFF \
-  -DWRAP_ITK_INSTALL_COMPONENT_PER_MODULE:BOOL=ON \
-  -DWRAP_ITK_INSTALL_COMPONENT_IDENTIFIER:STRING=PythonWheel \
-  ${WHEEL_CC:+-DCMAKE_C_COMPILER:STRING=$WHEEL_CC} \
-  ${WHEEL_CXX:+-DCMAKE_CXX_COMPILER:STRING=$WHEEL_CXX} \
-  -DPY_SITE_PACKAGES_PATH:STRING=.'''
+cmd = "python Utilities/Maintenance/configure_wrapped_itk.py"
 description = "Configure ITK for wheel slicing (per-module components + wheel-relative install)"
 outputs = ["build-python/CMakeCache.txt"]
 
