@@ -8,7 +8,7 @@ name = "itk-registration"
 version = "6.0b2"
 description = "ITK registration modules."
 readme = "../README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "itk-filtering==6.0b2",
 ]
