@@ -46,9 +46,9 @@ if [ -d /opt/python ]; then
     source "${gts_enable}"
   fi
 
-  # cp310 interpreter (ITK 6 needs Python >= 3.10) + pip cmake/ninja; no
+  # cp311 interpreter (ITK 6 needs Python >= 3.11) + pip cmake/ninja; no
   # pixi/conda toolchain here.
-  export PATH="/opt/python/cp310-cp310/bin:${PATH}"
+  export PATH="/opt/python/cp311-cp311/bin:${PATH}"
   python -m pip install --upgrade cmake ninja
 
   export WHEEL_CC=gcc WHEEL_CXX=g++

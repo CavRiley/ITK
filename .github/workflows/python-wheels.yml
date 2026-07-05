@@ -48,9 +48,9 @@ jobs:
           # so it is built PER PLATFORM here too (the guarded before-all is a no-op for it).
           python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/meta"
         env:
-          # One abi3 wheel per platform (requires wheel.py-api="cp310"); ITK 6
-          # requires Python >= 3.10 (CMake/ITKSetPython3Vars.cmake).
-          CIBW_BUILD: "cp310-*"
+          # One abi3 wheel per platform (requires wheel.py-api="cp311"); ITK 6
+          # requires Python >= 3.11 (CMake/ITKSetPython3Vars.cmake).
+          CIBW_BUILD: "cp311-*"
           CIBW_ARCHS: ${{ matrix.archs }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28

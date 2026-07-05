@@ -9,7 +9,7 @@ name = "itk-core"
 version = "6.0b2"                       # tracks the ITK version this wheel slices
 description = "ITK core modules — image classes, the NumPy bridge, and runtime."
 readme = "../README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "numpy",                            # core depends on nothing else in the ITK set
 ]
