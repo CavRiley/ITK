@@ -70,7 +70,19 @@ jobs:
             cmake.define.ITKPythonPackage_USE_TBB=OFF
 
           # cibuildwheel auto-repairs (auditwheel/delocate) — light here since ITK is static.
-          CIBW_TEST_COMMAND: 'python -c "import itk; print(itk.Version.GetITKVersion())"'
+          # No per-wheel CIBW_TEST_COMMAND: the group wheels depend on each other
+          # (itk-numerics needs itk-core) and are not on PyPI, so an isolated
+          # per-wheel install cannot resolve siblings. The whole set is smoke-tested
+          # together below instead.
+
+      - name: Smoke-test the full wheel set together
+        shell: bash
+        run: |
+          python -m pip install numpy   # only external dependency of the wheel set
+          # Resolve the itk meta-package and its six group wheels solely from the
+          # local build (--no-index); numpy is already satisfied above.
+          python -m pip install --no-index --find-links wheelhouse itk
+          python -c "import itk; print(itk.Version.GetITKVersion())"
 
       - uses: actions/upload-artifact@v4
         with:
