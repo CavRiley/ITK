@@ -46,11 +46,16 @@ jobs:
           done
           # meta ships no code but is tagged per platform+ABI (like PyPI's itk wheel),
           # so it is built PER PLATFORM here too (the guarded before-all is a no-op for it).
-          python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/meta"
+          # It has no binaries, so skip wheel repair — auditwheel/delocate error out
+          # with "no binary with the required architecture" on a code-less wheel.
+          CIBW_REPAIR_WHEEL_COMMAND="" python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/meta"
         env:
           # One abi3 wheel per platform (requires wheel.py-api="cp311"); ITK 6
           # requires Python >= 3.11 (CMake/ITKSetPython3Vars.cmake).
           CIBW_BUILD: "cp311-*"
+          # ITK ships glibc (manylinux) wheels only; musllinux is not a target and
+          # its Alpine/musl container cannot run the glibc vendored swig binary.
+          CIBW_SKIP: "*-musllinux*"
           CIBW_ARCHS: ${{ matrix.archs }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
