@@ -22,7 +22,11 @@
 set -euo pipefail
 
 PROJECT="${1:-$PWD}"
-BUILD="${PROJECT}/build-python"
+# Build tree location. On Linux, ITK_BINARY_DIR points at a Docker volume shared
+# across cibuildwheel's per-wheel containers (see CIBW_CONTAINER_ENGINE), so the
+# one build here is reused by every wheel instead of recompiled per container.
+# On macOS the shared workspace already persists it; locally it is build-python.
+BUILD="${ITK_BINARY_DIR:-${PROJECT}/build-python}"
 
 if [ -f "${BUILD}/cmake_install.cmake" ]; then
   echo "[cibw-before-all] wrapped ITK already present at ${BUILD} — reusing."
@@ -52,6 +56,7 @@ if [ -d /opt/python ]; then
   python -m pip install --upgrade cmake ninja
 
   export WHEEL_CC=gcc WHEEL_CXX=g++
+  export WHEEL_ITK_BUILD_DIR="${BUILD}"   # build into the shared volume, not /project
   python "${PROJECT}/Utilities/Maintenance/configure_wrapped_itk.py"
   cmake --build "${BUILD}"
 else

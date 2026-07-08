@@ -14,7 +14,6 @@ import sys
 
 CMAKE = [
     "cmake",
-    "-Bbuild-python",
     "-S.",
     "-GNinja",
     "-DITK_WRAP_PYTHON:BOOL=ON",
@@ -27,7 +26,10 @@ CMAKE = [
 
 
 def main() -> int:
-    cmd = list(CMAKE)
+    # Build tree location. Defaults to build-python (local/pixi flow); CI points
+    # it at a container-shared volume so the one build is reused across wheels.
+    build_dir = os.environ.get("WHEEL_ITK_BUILD_DIR", "build-python")
+    cmd = ["cmake", f"-B{build_dir}", *CMAKE[1:]]
     if cc := os.environ.get("WHEEL_CC"):
         cmd.append(f"-DCMAKE_C_COMPILER:STRING={cc}")
     if cxx := os.environ.get("WHEEL_CXX"):

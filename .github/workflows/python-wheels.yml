@@ -20,8 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: linux-x86_64,  runner: ubuntu-latest,    archs: x86_64,  itk_dir: /project/build-python }
-          - { id: linux-aarch64, runner: ubuntu-24.04-arm, archs: aarch64, itk_dir: /project/build-python }
+          - { id: linux-x86_64,  runner: ubuntu-latest,    archs: x86_64,  itk_dir: /itk-build/build-python }
+          - { id: linux-aarch64, runner: ubuntu-24.04-arm, archs: aarch64, itk_dir: /itk-build/build-python }
           - { id: macos-arm64,   runner: macos-14,         archs: arm64,   itk_dir: $GITHUB_WORKSPACE/build-python }
           - { id: macos-x86_64,  runner: macos-13,         archs: x86_64,  itk_dir: $GITHUB_WORKSPACE/build-python }
           # - { id: windows,     runner: windows-2022,     archs: AMD64,   itk_dir: ... }  # needs a .ps1 before-all variant
@@ -59,6 +59,12 @@ jobs:
           CIBW_ARCHS: ${{ matrix.archs }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+
+          # Linux only: mount one named volume into every per-wheel container so the
+          # wrapped-ITK build (into /itk-build, ITK_BINARY_DIR) is compiled once and
+          # reused, instead of recompiled per wheel. Ignored on native macOS, which
+          # already reuses the build in the shared workspace.
+          CIBW_CONTAINER_ENGINE: "docker; create_args: --volume itk-build:/itk-build"
 
           # Build wrapped ITK once, in-container, before the first wheel (guarded).
           CIBW_BEFORE_ALL: bash Utilities/Maintenance/cibw-build-wrapped-itk.sh "{project}"
