@@ -1,0 +1,125 @@
+# Build ITK Python wheels with cibuildwheel (experimental).
+#
+# One job per platform: ITK is compiled once inside the build container
+# (CIBW_BEFORE_ALL, guarded), then each group wheel is produced by pointing
+# cibuildwheel at its definition under Wrapping/Packaging/. A per-wheel matrix is
+# not used because the wrapped ITK tree is too large to share across runners.
+# Images, arches, and a Windows variant still need iteration in real CI.
+name: Python wheels
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["Wrapping/Packaging/**", "Utilities/Maintenance/cibw-build-wrapped-itk.sh", ".github/workflows/python-wheels.yml"]
+
+jobs:
+  wheels:
+    name: wheels ${{ matrix.id }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: linux-x86_64,  runner: ubuntu-latest,    archs: x86_64,  itk_dir: /itk-build/build-python }
+          - { id: linux-aarch64, runner: ubuntu-24.04-arm, archs: aarch64, itk_dir: /itk-build/build-python }
+          - { id: macos-arm64,   runner: macos-14,         archs: arm64,   itk_dir: $GITHUB_WORKSPACE/build-python }
+          # macos-x86_64 (macos-13) dropped: Intel macOS runners are being retired and
+          # the job routinely timed out in the runner queue. Re-add if x86 macOS demand returns.
+          # - { id: windows,     runner: windows-2022,     archs: AMD64,   itk_dir: ... }  # needs a .ps1 before-all variant
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ITK version is derived from git describe
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - run: python -m pip install "cibuildwheel>=2.20"
+
+      - name: Build all ITK wheels (one ITK compile, sliced per group)
+        shell: bash
+        run: |
+          for group in core numerics io filtering registration segmentation; do
+            echo "::group::itk-$group"
+            python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/$group"
+            echo "::endgroup::"
+          done
+          # meta ships no code but is tagged per platform+ABI (like PyPI's itk wheel),
+          # so it is built PER PLATFORM here too (the guarded before-all is a no-op for it).
+          # It has no binaries, so skip wheel repair — auditwheel/delocate error out
+          # with "no binary with the required architecture" on a code-less wheel.
+          CIBW_REPAIR_WHEEL_COMMAND="" python -m cibuildwheel --output-dir wheelhouse "Wrapping/Packaging/meta"
+        env:
+          # One abi3 wheel per platform (requires wheel.py-api="cp311"); ITK 6
+          # requires Python >= 3.11 (CMake/ITKSetPython3Vars.cmake).
+          CIBW_BUILD: "cp311-*"
+          # ITK ships glibc (manylinux) wheels only; musllinux is not a target and
+          # its Alpine/musl container cannot run the glibc vendored swig binary.
+          CIBW_SKIP: "*-musllinux*"
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+
+          # Linux only: mount one named volume into every per-wheel container so the
+          # wrapped-ITK build (into /itk-build, ITK_BINARY_DIR) is compiled once and
+          # reused, instead of recompiled per wheel. Ignored on native macOS, which
+          # already reuses the build in the shared workspace.
+          CIBW_CONTAINER_ENGINE: "docker; create_args: --volume itk-build:/itk-build"
+
+          # Build wrapped ITK once, in-container, before the first wheel (guarded).
+          CIBW_BEFORE_ALL: bash Utilities/Maintenance/cibw-build-wrapped-itk.sh "{project}"
+
+          # Every wheel slices the one ITK build. {project} resolves to the
+          # in-container/in-checkout root; itk_dir handles the Linux-vs-native path.
+          CIBW_ENVIRONMENT: >-
+            ITK_BINARY_DIR=${{ matrix.itk_dir }}
+            ITK_SOURCE_DIR={project}
+          # ITK_BINARY_DIR is passed via CIBW_ENVIRONMENT, not here: config
+          # settings are not shell-expanded, so $GITHUB_WORKSPACE would stay literal.
+          CIBW_CONFIG_SETTINGS: >-
+            cmake.define.ITKPythonPackage_ITK_BINARY_REUSE=ON
+            cmake.define.ITKPythonPackage_USE_TBB=OFF
+
+          # cibuildwheel auto-repairs (auditwheel/delocate) — light here since ITK is static.
+          # No per-wheel CIBW_TEST_COMMAND: the group wheels depend on each other
+          # (itk-numerics needs itk-core) and are not on PyPI, so an isolated
+          # per-wheel install cannot resolve siblings. The whole set is smoke-tested
+          # together below instead.
+
+      - name: Smoke-test the full wheel set together
+        shell: bash
+        run: |
+          python -m pip install numpy   # only external dependency of the wheel set
+          # Resolve the itk meta-package and its six group wheels solely from the
+          # local build (--no-index); numpy is already satisfied above.
+          python -m pip install --no-index --find-links wheelhouse itk
+          python -c "import itk; print(itk.Version.GetITKVersion())"
+
+      # One table per job on the run's Summary page listing every wheel produced,
+      # so the whole set is visible at a glance instead of only the last cibuildwheel
+      # invocation's output. Runs even on failure to show what was built.
+      - name: Wheel build summary
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          wheels=(wheelhouse/*.whl)
+          {
+            echo "## ITK wheels — ${{ matrix.id }} (${#wheels[@]})"
+            echo ""
+            if [ ${#wheels[@]} -gt 0 ]; then
+              echo "| Wheel | Size |"
+              echo "|-------|------|"
+              for whl in "${wheels[@]}"; do
+                printf '| `%s` | %s |\n' "$(basename "$whl")" "$(du -h "$whl" | cut -f1)"
+              done
+            else
+              echo "_No wheels were produced._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itk-wheels-${{ matrix.id }}
+          path: wheelhouse/*.whl

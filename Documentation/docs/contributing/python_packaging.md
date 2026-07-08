@@ -22,6 +22,33 @@ Building ITK Python wheels requires the following:
 - C++ Compiler (see [scikit-build platform specific requirements](https://scikit-build.readthedocs.io/en/latest/generators.html))
 - Python >= 3.11
 
+## In-Tree Wheel Build (experimental)
+
+ITK can also build its Python wheels directly from this repository, without the
+external [ITKPythonPackage] project. The wheel definitions live in
+[`Wrapping/Packaging/`](https://github.com/InsightSoftwareConsortium/ITK/tree/main/Wrapping/Packaging),
+which slices a single pre-built, Python-wrapped ITK tree into the per-group
+wheels (`itk-core`, `itk-numerics`, `itk-io`, `itk-filtering`,
+`itk-registration`, `itk-segmentation`) plus the `itk` meta-package. ITK is
+compiled once; each wheel is produced by installing only its modules' wrapping
+components, with no per-wheel recompilation.
+
+The `wheel` pixi environment provides the full flow:
+
+```bash
+# Build the wrapped ITK tree once (the reuse target every wheel slices)
+pixi run -e wheel build-wrapped-itk
+
+# Slice that tree into all ITK Python wheels
+pixi run -e wheel build-wheels
+```
+
+See [`Wrapping/Packaging/README.md`](https://github.com/InsightSoftwareConsortium/ITK/blob/main/Wrapping/Packaging/README.md)
+for the architecture, the per-group module placement, and platform notes. A
+[cibuildwheel](https://cibuildwheel.pypa.io/) workflow that builds ITK once
+inside the manylinux container and slices the wheels per platform is sketched in
+`.github/workflows/python-wheels.yml`.
+
 ## Automated Platform Scripts
 
 The following sections outline how to use the ITKPythonPackage project to build wheels on Linux, macOS, and Windows. Each script will fetch tagged ITK sources, build ITK with Python wrappings, and package binaries into the Python wheel archive format for distribution.

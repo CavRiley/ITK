@@ -1,0 +1,24 @@
+# itk-core — foundation wheel. Build defines are passed at build time; see
+# ../README.md.
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "itk-core"
+version = "6.0b2"                       # tracks the ITK version this wheel slices
+description = "ITK core modules — image classes, the NumPy bridge, and runtime."
+readme = "../README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",                            # core depends on nothing else in the ITK set
+]
+
+[tool.scikit-build]
+# Shared CMake source; the wheel is selected by ITKPythonPackage_WHEEL_NAME.
+cmake.source-dir = ".."
+cmake.build-type = "Release"
+cmake.version = ">=3.26.6"
+build-dir = "build/{wheel_tag}"
+wheel.platlib = true                    # carries compiled .so/.pyd
+install.strip = true
