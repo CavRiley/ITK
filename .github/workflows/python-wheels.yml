@@ -23,7 +23,8 @@ jobs:
           - { id: linux-x86_64,  runner: ubuntu-latest,    archs: x86_64,  itk_dir: /itk-build/build-python }
           - { id: linux-aarch64, runner: ubuntu-24.04-arm, archs: aarch64, itk_dir: /itk-build/build-python }
           - { id: macos-arm64,   runner: macos-14,         archs: arm64,   itk_dir: $GITHUB_WORKSPACE/build-python }
-          - { id: macos-x86_64,  runner: macos-13,         archs: x86_64,  itk_dir: $GITHUB_WORKSPACE/build-python }
+          # macos-x86_64 (macos-13) dropped: Intel macOS runners are being retired and
+          # the job routinely timed out in the runner queue. Re-add if x86 macOS demand returns.
           # - { id: windows,     runner: windows-2022,     archs: AMD64,   itk_dir: ... }  # needs a .ps1 before-all variant
 
     steps:
@@ -94,6 +95,29 @@ jobs:
           # local build (--no-index); numpy is already satisfied above.
           python -m pip install --no-index --find-links wheelhouse itk
           python -c "import itk; print(itk.Version.GetITKVersion())"
+
+      # One table per job on the run's Summary page listing every wheel produced,
+      # so the whole set is visible at a glance instead of only the last cibuildwheel
+      # invocation's output. Runs even on failure to show what was built.
+      - name: Wheel build summary
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          wheels=(wheelhouse/*.whl)
+          {
+            echo "## ITK wheels — ${{ matrix.id }} (${#wheels[@]})"
+            echo ""
+            if [ ${#wheels[@]} -gt 0 ]; then
+              echo "| Wheel | Size |"
+              echo "|-------|------|"
+              for whl in "${wheels[@]}"; do
+                printf '| `%s` | %s |\n' "$(basename "$whl")" "$(du -h "$whl" | cut -f1)"
+              done
+            else
+              echo "_No wheels were produced._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
